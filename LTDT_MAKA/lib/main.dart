@@ -49,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
     const IntroductionScreen(),
     const StockForecastScreen(),
     const DataManagementScreen(),
-    const PlaceholderScreen(title: 'Cài đặt hệ thống'),
+    const SettingsScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -62,7 +62,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: _screens[_selectedIndex],
+        child: IndexedStack(index: _selectedIndex, children: _screens),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -115,7 +115,7 @@ class IntroductionScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Chào mừng đến với Hệ thống Dự báo Chứng khoán Báo Đầu Tư',
+            'Chào mừng đến với Hệ thống dự báo chứng khoán đầu tư dựa trên cảm xúc',
             style: TextStyle(
               fontSize: 16,
               color: Colors.white70,
@@ -148,7 +148,7 @@ class IntroductionScreen extends StatelessWidget {
             context,
             icon: Icons.trending_up,
             title: '1. Dự báo giá cổ phiếu',
-            description: '• Dự báo đa mô hình: Sử dụng các mô hình Random Forest, XGBoost, LightGBM và Decision Tree.\n• Trực quan hóa tương tác: Biểu đồ giá lịch sử và dự báo.\n• Tích hợp Báo Đầu Tư: Neo dự báo theo các điểm dữ liệu uy tín.',
+            description: '• Dự báo đa mô hình: Sử dụng các mô hình Basic LSTM Hybrid DLinear + Node và Sentiment DLinear + Node.\n• Trực quan hóa tương tác: Biểu đồ dự báo.\n• Tích hợp Báo Đầu Tư: Neo dự báo theo các điểm cảm xúc và hành vi con người.',
           ),
           _buildFeatureCard(
             context,
@@ -160,7 +160,7 @@ class IntroductionScreen extends StatelessWidget {
             context,
             icon: Icons.settings,
             title: '3. Cài đặt hệ thống',
-            description: '• Huấn luyện lại mô hình: Tùy chọn để huấn luyện lại tất cả các mô hình trên bộ dữ liệu mới nhất.\n• Thông tin gỡ lỗi: Hiển thị thông tin chi tiết về quá trình hoạt động.',
+            description: '• Huấn luyện lại mô hình.',
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -177,7 +177,7 @@ class IntroductionScreen extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Vui lòng chọn một chức năng từ Menu chức năng ở thanh bên để bắt đầu!',
+                'Chọn một chức năng từ menu bên dưới để bắt đầu!',
                 style: TextStyle(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
@@ -225,16 +225,86 @@ class IntroductionScreen extends StatelessWidget {
   }
 }
 
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _isTraining = false;
+
+  void _startTraining() {
+    setState(() {
+      _isTraining = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 24, color: Colors.white),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Cài đặt hệ thống',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 24),
+          if (_isTraining)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Đang huấn luyện lại mô hình...',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Quá trình này có thể mất một lúc. Bạn có thể điều hướng đến các màn hình khác trong khi quá trình này chạy ngầm.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Huấn luyện lại mô hình',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nhấn nút bên dưới để bắt đầu quá trình huấn luyện lại các mô hình dự báo với dữ liệu mới nhất. Quá trình này sẽ đảm bảo các dự đoán có độ chính xác cao nhất.',
+                  style: TextStyle(fontSize: 16, color: Colors.white70),
+                ),
+                const SizedBox(height: 32),
+                Center(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.model_training),
+                    label: const Text('Bắt đầu Huấn luyện'),
+                    onPressed: _startTraining,
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }

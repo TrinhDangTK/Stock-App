@@ -98,18 +98,35 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Dữ liệu hệ thống', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 24),
-          const Text('Dữ liệu Price (Giá)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text(
+            'Quản lý Dữ liệu',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Màn hình này cho phép bạn xem các tệp dữ liệu giá và dữ liệu cảm xúc được sử dụng cho việc dự đoán. Chọn một tệp từ danh sách để xem nội dung chi tiết.',
+            style: TextStyle(fontSize: 16, color: Colors.white70),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            'Dữ liệu giá',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
           const SizedBox(height: 16),
           _buildFileListView(_priceFiles),
           const SizedBox(height: 32),
-          const Text('Dữ liệu Sentiment (Cảm xúc)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text(
+            'Dữ liệu cảm xúc',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
           const SizedBox(height: 16),
           _buildFileListView(_sentimentFiles),
           const SizedBox(height: 32),
           if (_selectedFileName != null) ...[
-            Text('Nội dung file: $_selectedFileName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(
+              'Nội dung tệp: $_selectedFileName',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
             const SizedBox(height: 16),
             _isLoading ? const Center(child: CircularProgressIndicator()) : _buildDataTable(),
           ],
@@ -120,7 +137,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
 
   Widget _buildFileListView(List<String> files) {
     if (files.isEmpty) {
-      return const Text('Không tìm thấy file nào. Vui lòng chạy lại ứng dụng.', style: TextStyle(color: Colors.white70));
+      return const Text(
+        'Không tìm thấy tệp nào. Hãy chắc chắn rằng các tệp dữ liệu đã được thêm vào thư mục assets.',
+        style: TextStyle(color: Colors.white70),
+      );
     }
     return Container(
       height: 180,
@@ -149,7 +169,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
 
   Widget _buildDataTable() {
     if (_selectedFileData.isEmpty) {
-      return const Center(child: Text('File không có dữ liệu.', style: TextStyle(color: Colors.white70)));
+      return const Center(child: Text('Tệp không có dữ liệu hoặc đang tải...', style: TextStyle(color: Colors.white70)));
     }
     return Container(
       width: double.infinity,
