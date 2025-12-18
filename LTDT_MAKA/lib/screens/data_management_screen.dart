@@ -1,9 +1,5 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:csv/csv.dart';
-import 'package:excel/excel.dart';
-import 'package:flutter/material.dart' hide Border; 
-import 'package:flutter/material.dart' as material; 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle, AssetManifest;
 
 class DataManagementScreen extends StatefulWidget {
@@ -14,156 +10,85 @@ class DataManagementScreen extends StatefulWidget {
 }
 
 class _DataManagementScreenState extends State<DataManagementScreen> {
-  // Data for Raw Table
-  List<Map<String, String>> _rawData = [];
-  final String _assetInputPath = 'input_data/';
+  List<String> _priceFiles = [];
+  List<String> _sentimentFiles = [];
 
-  Future<void> _loadDataFromAssets() async {
+  List<List<dynamic>> _selectedFileData = [];
+  List<String> _selectedFileHeaders = [];
+  String? _selectedFileName;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _listAssetFiles();
+  }
+
+  Future<void> _listAssetFiles() async {
     try {
-      // 1. Lấy danh sách assets bằng API mới
       final AssetManifest assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final List<String> assets = assetManifest.listAssets();
+      final List<String> allAssets = assetManifest.listAssets();
       
-      // 2. Lọc ra các file nằm trong input_data/
-      List<String> inputFiles = assets
-          .where((key) => key.startsWith(_assetInputPath))
-          .where((key) => key.endsWith('.xlsx') || key.endsWith('.xls') || key.endsWith('.csv'))
+      // DEBUG: In ra tất cả các asset mà ứng dụng tìm thấy
+      print('--- Assets Found in Bundle ---');
+      print(allAssets);
+      print('------------------------------');
+
+      final priceAssets = allAssets
+          .where((key) => key.startsWith('input_data/PRICE/') && key.toLowerCase().endsWith('.csv'))
           .toList();
 
-      if (inputFiles.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không tìm thấy file dữ liệu nào trong Assets (input_data/).')),
-          );
-        }
-        return;
-      }
-
-      // 3. Đọc file đầu tiên tìm thấy
-      String targetFile = inputFiles.first;
-      print('Loading asset: $targetFile');
-
-      // 4. Load file content
-      ByteData data = await rootBundle.load(targetFile);
-      List<int> bytes = data.buffer.asUint8List();
+      final sentimentAssets = allAssets
+          .where((key) => key.startsWith('input_data/SENTIMENT/') && key.toLowerCase().endsWith('.csv'))
+          .toList();
       
-      await _processFileContent(bytes, targetFile);
+      print('Price files found: ${priceAssets.length}');
+      print('Sentiment files found: ${sentimentAssets.length}');
 
-    } catch (e) {
-      print('Error loading assets: $e');
-      // Fallback cho Flutter version cũ hơn nếu AssetManifest.loadFromAssetBundle không có
-      try {
-        final manifestContent = await rootBundle.loadString('AssetManifest.json');
-        final Map<String, dynamic> manifestMap = json.decode(manifestContent);
-        List<String> inputFiles = manifestMap.keys
-            .where((key) => key.startsWith(_assetInputPath))
-            .where((key) => key.endsWith('.xlsx') || key.endsWith('.xls') || key.endsWith('.csv'))
-            .toList();
-            
-        if (inputFiles.isNotEmpty) {
-           String targetFile = inputFiles.first;
-           ByteData data = await rootBundle.load(targetFile);
-           List<int> bytes = data.buffer.asUint8List();
-           await _processFileContent(bytes, targetFile);
-           return;
-        }
-      } catch (e2) {
-         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi tải assets: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _processFileContent(List<int> bytes, String fileName) async {
-    List<Map<String, String>> newData = [];
-    int idCounter = 0; 
-    
-    String lowerName = fileName.toLowerCase();
-
-    if (lowerName.endsWith('.csv')) {
-      try {
-        String csvContent = utf8.decode(bytes);
-        List<List<dynamic>> rows = const CsvToListConverter().convert(csvContent);
-        newData = _processRows(rows, refIdCounter: idCounter);
-      } catch (e) {
-        print('Error reading CSV: $e');
-      }
-    } else {
-      try {
-        var excel = Excel.decodeBytes(bytes);
-        for (var table in excel.tables.keys) {
-          var sheet = excel.tables[table];
-          if (sheet == null) continue;
-          
-          List<List<dynamic>> rows = [];
-          for (var row in sheet.rows) {
-            rows.add(row.map((cell) => cell?.value).toList());
-          }
-          
-          newData = _processRows(rows, refIdCounter: idCounter);
-          break; 
-        }
-      } catch (e) {
-        print('Error reading Excel: $e');
-      }
-    }
-
-    setState(() {
-      _rawData = newData;
-    });
-
-    if (mounted) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã tải ${newData.length} dòng dữ liệu từ $fileName')),
-      );
-    }
-  }
-
-  List<Map<String, String>> _processRows(List<List<dynamic>> rows, {required int refIdCounter}) {
-    List<Map<String, String>> result = [];
-    bool isFirstRow = true;
-    int localCounter = refIdCounter;
-
-    for (var row in rows) {
-      if (isFirstRow) {
-        isFirstRow = false;
-        continue; // Skip header
-      }
-
-      String getCellValue(int index) {
-        if (index < row.length && row[index] != null) {
-           return row[index].toString();
-        }
-        return '';
-      }
-
-      String createdAt = getCellValue(0);
-      String header = getCellValue(1);
-      String content = getCellValue(2);
-
-      if (createdAt.isNotEmpty || header.isNotEmpty || content.isNotEmpty) {
-        result.add({
-          'id': localCounter.toString(),
-          'createdAt': createdAt,
-          'header': header,
-          'content': content,
+      if (mounted) {
+        setState(() {
+          _priceFiles = priceAssets;
+          _sentimentFiles = sentimentAssets;
         });
-        localCounter++;
+      }
+    } catch (e) {
+      print('Error listing assets: $e');
+    }
+  }
+
+  Future<void> _loadFile(String assetPath) async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _selectedFileName = assetPath.split('/').last;
+        _selectedFileData = [];
+        _selectedFileHeaders = [];
+      });
+    }
+
+    try {
+      final csvString = await rootBundle.loadString(assetPath);
+      List<List<dynamic>> rows = const CsvToListConverter().convert(csvString);
+
+      if (rows.isNotEmpty) {
+        _selectedFileHeaders = rows.first.map((e) => e.toString()).toList();
+        rows.removeAt(0); // Remove header
+      }
+
+      if (mounted) {
+        setState(() {
+          _selectedFileData = rows;
+        });
+      }
+    } catch (e) {
+      print('Error loading asset $assetPath: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
-    return result;
-  }
-  
-  void _resetData() {
-    setState(() {
-      _rawData = [];
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã xóa toàn bộ dữ liệu')),
-    );
   }
 
   @override
@@ -173,141 +98,75 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Hệ thống dự báo chứng khoán',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+          const Text('Dữ liệu hệ thống', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 24),
-          
-          // Action Buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              ElevatedButton(
-                onPressed: _loadDataFromAssets,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2D2D3F),
-                  foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.grey.withOpacity(0.5)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-                child: const Text('Cào dữ liệu'),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: _resetData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB71C1C), // Dark red for reset
-                  foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.red.withOpacity(0.5)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-                child: const Text('Reset dữ liệu'),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Table 1: Raw Data
-          const Text(
-            'Dữ liệu vào được từ Báo đầu tư',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+          const Text('Dữ liệu Price (Giá)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return _buildRawDataTable(context, constraints.maxWidth);
-            },
-          ),
+          _buildFileListView(_priceFiles),
+          const SizedBox(height: 32),
+          const Text('Dữ liệu Sentiment (Cảm xúc)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 16),
+          _buildFileListView(_sentimentFiles),
+          const SizedBox(height: 32),
+          if (_selectedFileName != null) ...[
+            Text('Nội dung file: $_selectedFileName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+            _isLoading ? const Center(child: CircularProgressIndicator()) : _buildDataTable(),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildRawDataTable(BuildContext context, double maxWidth) {
-    return _buildTableContainer(
-      context,
-      ConstrainedBox(
-        constraints: BoxConstraints(minWidth: maxWidth),
-        child: DataTable(
-          columnSpacing: 10,
-          horizontalMargin: 10,
-          columns: const [
-            DataColumn(
-              label: Text('#'),
+  Widget _buildFileListView(List<String> files) {
+    if (files.isEmpty) {
+      return const Text('Không tìm thấy file nào. Vui lòng chạy lại ứng dụng.', style: TextStyle(color: Colors.white70));
+    }
+    return Container(
+      height: 180,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2D2D3F),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: ListView.builder(
+        itemCount: files.length,
+        itemBuilder: (context, index) {
+          final fileName = files[index].split('/').last;
+          final isSelected = files[index].endsWith(_selectedFileName ?? '');
+          return Material(
+            color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.3) : Colors.transparent,
+            child: ListTile(
+              title: Text(fileName, style: const TextStyle(color: Colors.white)),
+              onTap: () => _loadFile(files[index]),
+              dense: true,
             ),
-            DataColumn(
-              label: Text('Created At'),
-            ),
-            DataColumn(
-              label: Expanded(child: Text('Header')),
-            ),
-            DataColumn(
-              label: Expanded(child: Text('Content')),
-            ),
-          ],
-          rows: _rawData.map((row) {
-            return DataRow(cells: [
-              DataCell(Text(row['id'] ?? '')),
-              DataCell(Text(row['createdAt'] ?? '')),
-              DataCell(
-                Container(
-                  width: maxWidth * 0.3,
-                  child: Text(row['header'] ?? '', overflow: TextOverflow.ellipsis),
-                ),
-              ),
-              DataCell(
-                Container(
-                  width: maxWidth * 0.4,
-                  child: Text(row['content'] ?? '', overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ]);
-          }).toList(),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildTableContainer(BuildContext context, Widget child) {
+  Widget _buildDataTable() {
+    if (_selectedFileData.isEmpty) {
+      return const Center(child: Text('File không có dữ liệu.', style: TextStyle(color: Colors.white70)));
+    }
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: const Color(0xFF2D2D3F),
         borderRadius: BorderRadius.circular(8),
-        border: material.Border.all(color: Colors.white10), // Explicitly use material.Border
+        border: Border.all(color: Colors.white10),
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.white10,
-          dataTableTheme: DataTableThemeData(
-            headingRowColor: WidgetStateProperty.all(Colors.white.withOpacity(0.05)),
-            dataRowColor: WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
-              return null; // Use default
-            }),
-            headingTextStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white70,
-              fontSize: 13,
-            ),
-            dataTextStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-            ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 32),
+          child: DataTable(
+            columnSpacing: 20,
+            columns: _selectedFileHeaders.map((header) => DataColumn(label: Text(header, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))).toList(),
+            rows: _selectedFileData.map((row) => DataRow(cells: row.map((cell) => DataCell(Text(cell.toString(), style: const TextStyle(color: Colors.white)))).toList())).toList(),
           ),
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: child,
         ),
       ),
     );
